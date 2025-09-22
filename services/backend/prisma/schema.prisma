@@ -1,0 +1,110 @@
+// // This is your Prisma schema file,
+// // learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// generator client {
+//   provider = "prisma-client-js"
+// }
+
+// datasource db {
+//   provider = "postgresql"
+//   url      = env("DATABASE_URL")
+// }
+
+// model User {
+//   id        String   @id @default(uuid())
+//   email     String   @unique
+//   name      String
+//   password  String
+//   createdAt DateTime @default(now()) @map("created_at")
+//   updatedAt DateTime @updatedAt @map("updated_at")
+
+//   @@map("users")
+// }
+
+// model Camera {
+//   id        String   @id @default(uuid())
+//   name      String
+//   rtspUrl   String   @map("rtsp_url")
+//   location  String
+//   isActive  Boolean  @default(false) @map("is_active")
+//   status    String   @default("offline") // online, offline, error
+//   createdAt DateTime @default(now()) @map("created_at")
+//   updatedAt DateTime @updatedAt @map("updated_at")
+
+//   // Relations
+//   events Event[]
+
+//   @@map("cameras")
+// }
+
+// model Event {
+//   id         String   @id @default(uuid())
+//   cameraId   String   @map("camera_id")
+//   type       String   // face_detected, camera_offline, stream_error
+//   message    String
+//   confidence Float?   // for face detection confidence
+//   metadata   Json?    // additional event data (bounding boxes, etc.)
+//   timestamp  DateTime @default(now())
+
+//   // Relations
+//   camera Camera @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+
+//   @@index([cameraId])
+//   @@index([type])
+//   @@index([timestamp])
+//   @@map("events")
+// }
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  email     String   @unique
+  name      String
+  password  String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Camera {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  rtspUrl   String   @map("rtsp_url")
+  location  String
+  isActive  Boolean  @default(false) @map("is_active")
+  status    String   @default("offline") // online, offline, error
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  events Event[]
+
+  @@map("cameras")
+}
+
+model Event {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  cameraId   String   @map("camera_id") @db.ObjectId
+  type       String   // face_detected, camera_offline, stream_error
+  message    String
+  confidence Float?   // for face detection confidence
+  metadata   Json?    // additional event data (bounding boxes, etc.)
+  timestamp  DateTime @default(now())
+
+  // Relations
+  camera Camera @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+
+  @@index([cameraId])
+  @@index([type])
+  @@index([timestamp])
+  @@map("events")
+}

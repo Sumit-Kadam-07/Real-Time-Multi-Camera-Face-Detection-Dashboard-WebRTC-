@@ -1,0 +1,139 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: rtc_postgres
+    environment:
+      POSTGRES_DB: rtc_dashboard
+      POSTGRES_USER: rtc_user
+      POSTGRES_PASSWORD: rtc_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./services/backend/prisma/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rtc_user -d rtc_dashboard"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Backend API Service
+  backend:
+    build:
+      context: ./services/backend
+      dockerfile: Dockerfile
+    container_name: rtc_backend
+    environment:
+      DATABASE_URL: postgresql://rtc_user:rtc_password@postgres:5432/rtc_dashboard
+      JWT_SECRET: super-secret-jwt-key-for-production-change-this
+      PORT: 8080
+      WORKER_API_URL: http://worker:8081
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./services/backend:/app
+    command: npm run dev
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Worker Service (Face Detection)
+  worker:
+    build:
+      context: ./services/worker
+      dockerfile: Dockerfile
+    container_name: rtc_worker
+    environment:
+      PORT: 8081
+      BACKEND_API_URL: http://backend:8080/api
+      MEDIAMTX_URL: http://mediamtx:8889
+      OPENCV_LOG_LEVEL: ERROR
+    ports:
+      - "8081:8081"
+    depends_on:
+      - backend
+      - mediamtx
+    volumes:
+      - ./services/worker:/app
+    command: go run main.go
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MediaMTX (WebRTC/RTSP Server)
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: rtc_mediamtx
+    environment:
+      # Enable WebRTC
+      MTX_WEBRTCADDITIONALHOSTS: localhost
+      # RTSP settings
+      MTX_RTSPADDRESS: :8554
+      # HTTP API
+      MTX_APIHTTPADDRESS: :8889
+    ports:
+      - "8889:8889"   # HTTP API and WebRTC
+      - "8554:8554"   # RTSP
+      - "8000:8000/udp" # RTP
+      - "8001:8001/udp" # RTCP
+    volumes:
+      - ./infrastructure/mediamtx/mediamtx.yml:/mediamtx.yml
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8889/v1/config/get"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend (React App)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: rtc_frontend
+    environment:
+      VITE_API_URL: http://localhost:8080/api
+      VITE_WS_URL: ws://localhost:8080/ws
+      VITE_WEBRTC_URL: http://localhost:8889
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: npm run dev
+
+  # Nginx Reverse Proxy (Optional)
+  nginx:
+    image: nginx:alpine
+    container_name: rtc_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./infrastructure/nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - frontend
+      - backend
+      - worker
+    profiles:
+      - production
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  default:
+    name: rtc_network

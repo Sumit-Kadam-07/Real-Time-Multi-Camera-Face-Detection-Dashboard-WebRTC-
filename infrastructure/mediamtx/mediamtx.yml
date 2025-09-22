@@ -1,0 +1,94 @@
+# MediaMTX configuration for WebRTC streaming
+
+# Log level: error, warn, info, debug
+logLevel: info
+logDestinations: [stdout]
+
+# API settings
+api: yes
+apiAddress: :8889
+
+# WebRTC configuration
+webRTC: yes
+webRTCAddress: :8889
+webRTCEncryption: no
+webRTCServerKey: server.key
+webRTCServerCert: server.crt
+webRTCAllowOrigin: "*"
+webRTCTrustedProxies: []
+webRTCLocalUDPAddress: :8000
+webRTCLocalTCPAddress: :8001
+
+# RTSP settings
+rtsp: yes
+rtspAddress: :8554
+rtspUDPRTPAddress: :8002
+rtspUDPRTCPAddress: :8003
+rtspMulticastIPRange: 224.1.0.0/16
+rtspMulticastRTPPort: 8004
+rtspMulticastRTCPPort: 8005
+
+# HLS settings (optional)
+hls: yes
+hlsAddress: :8888
+hlsEncryption: no
+hlsServerKey: server.key
+hlsServerCert: server.crt
+hlsAllowOrigin: "*"
+hlsTrustedProxies: []
+
+# Path settings
+paths:
+  # Default path for all streams
+  all:
+    # Source can be RTSP, WebRTC, etc.
+    source: publisher
+    sourceFingerprint: ""
+    sourceOnDemand: no
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 10s
+    
+    # Allow publishing from worker service
+    publishUser: ""
+    publishPass: ""
+    publishIPs: []
+    
+    # Allow reading from frontend
+    readUser: ""
+    readPass: ""
+    readIPs: []
+    
+    # Enable WebRTC publishing and reading
+    webRTCDisable: no
+    
+    # Enable RTSP reading
+    rtspDisable: no
+    
+    # Run commands on events (optional)
+    runOnInit: ""
+    runOnInitRestart: no
+    runOnDemand: ""
+    runOnDemandRestart: no
+    runOnDemandStartTimeout: 10s
+    runOnDemandCloseAfter: 10s
+    runOnPublish: ""
+    runOnPublishRestart: no
+    runOnRead: ""
+    runOnReadRestart: no
+
+  # Specific paths for camera streams
+  cam-1:
+    source: rtsp://demo:demo@192.168.1.101/stream1
+    sourceOnDemand: yes
+    
+  cam-2:
+    source: rtsp://demo:demo@192.168.1.102/stream1
+    sourceOnDemand: yes
+    
+  cam-3:
+    source: rtsp://demo:demo@192.168.1.103/stream1
+    sourceOnDemand: yes
+    
+  cam-4:
+    source: rtsp://demo:demo@192.168.1.104/stream1
+    sourceOnDemand: yes
