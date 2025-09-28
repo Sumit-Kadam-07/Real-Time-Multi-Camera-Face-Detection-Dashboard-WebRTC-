@@ -314,8 +314,6 @@ docker-compose restart worker mediamtx
 ### Getting Help
 
 - Create an issue for bugs or feature requests
-- Check the [Wiki](wiki-url) for detailed guides
-- Join our [Discord](discord-url) community
 
 ---
 
