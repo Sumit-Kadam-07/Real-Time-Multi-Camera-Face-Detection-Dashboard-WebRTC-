@@ -4,11 +4,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { Camera, Eye, EyeOff } from 'lucide-react';
 
 const LoginPage: React.FC = () => {
-  const { user, login, register, isLoading } = useAuth();
-  const [isRegistering, setIsRegistering] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
+  const { user, login, isLoading } = useAuth();
+  const [email, setEmail] = useState('demo@example.com');
+  const [password, setPassword] = useState('demo123');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
 
@@ -20,20 +18,9 @@ const LoginPage: React.FC = () => {
     e.preventDefault();
     setError('');
 
-    if (isRegistering) {
-      if (!name.trim()) {
-        setError('Name is required');
-        return;
-      }
-      const success = await register(email, password, name);
-      if (!success) {
-        setError('Registration failed. Please try again.');
-      }
-    } else {
-      const success = await login(email, password);
-      if (!success) {
-        setError('Invalid email or password');
-      }
+    const success = await login(email, password);
+    if (!success) {
+      setError('Invalid email or password');
     }
   };
 
@@ -45,10 +32,10 @@ const LoginPage: React.FC = () => {
             <Camera className="h-12 w-12 text-blue-600" />
           </div>
           <h2 className="mt-6 text-3xl font-bold text-gray-900">
-            Face Detection Dashboard
+            Camera Dashboard
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            {isRegistering ? 'Create an account' : 'Sign in to access your camera feeds'}
+            Sign in to access your camera feeds
           </p>
         </div>
 
@@ -60,23 +47,12 @@ const LoginPage: React.FC = () => {
               </div>
             )}
 
-            {isRegistering && (
-              <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                  Full Name
-                </label>
-                <input
-                  id="name"
-                  name="name"
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter your full name"
-                />
-              </div>
-            )}
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+              <p className="text-xs text-blue-600 font-medium">Demo Credentials</p>
+              <p className="text-xs text-blue-500">
+                Email: demo@example.com | Password: demo123
+              </p>
+            </div>
 
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
@@ -133,25 +109,12 @@ const LoginPage: React.FC = () => {
               {isLoading ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  {isRegistering ? 'Creating account...' : 'Signing in...'}
+                  Signing in...
                 </>
               ) : (
-                isRegistering ? 'Create Account' : 'Sign in'
+                'Sign in'
               )}
             </button>
-
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsRegistering(!isRegistering);
-                  setError('');
-                }}
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-              >
-                {isRegistering ? 'Already have an account? Sign in' : 'Need an account? Register'}
-              </button>
-            </div>
           </form>
         </div>
       </div>

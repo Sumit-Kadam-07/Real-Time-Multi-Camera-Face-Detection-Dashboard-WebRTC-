@@ -1,247 +1,159 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { supabase } from '../lib/supabase';
-import { authMiddleware } from '../middleware/auth';
 
 const app = new Hono();
 
-app.use('/*', authMiddleware);
-
+// Mock camera database
+let cameras = [
+  {
+    id: 'cam-1',
+    name: 'Front Entrance',
+    rtspUrl: 'rtsp://demo:demo@192.168.1.101/stream1',
+    location: 'Building A - Main Door',
+    isActive: true,
+    status: 'online' as const,
+    createdAt: new Date('2024-01-15'),
+    updatedAt: new Date('2024-01-15')
+  },
+  {
+    id: 'cam-2',
+    name: 'Parking Lot',
+    rtspUrl: 'rtsp://demo:demo@192.168.1.102/stream1',
+    location: 'Building A - East Side',
+    isActive: true,
+    status: 'online' as const,
+    createdAt: new Date('2024-01-16'),
+    updatedAt: new Date('2024-01-16')
+  }
+];
 
 const createCameraSchema = z.object({
   name: z.string().min(1),
-  rtspUrl: z.string().min(1),
-  location: z.string().min(1),
-  faceDetectionEnabled: z.boolean().optional(),
-  fpsLimit: z.number().min(1).max(60).optional()
+  rtspUrl: z.string().url(),
+  location: z.string().min(1)
 });
 
 const updateCameraSchema = z.object({
   name: z.string().min(1).optional(),
-  rtspUrl: z.string().min(1).optional(),
-  location: z.string().min(1).optional(),
-  faceDetectionEnabled: z.boolean().optional(),
-  fpsLimit: z.number().min(1).max(60).optional()
+  rtspUrl: z.string().url().optional(),
+  location: z.string().min(1).optional()
 });
 
-app.get('/', async (c) => {
-  try {
-    const userId = c.get('userId');
+// Get all cameras
+app.get('/', (c) => {
+  return c.json({ cameras });
+});
 
-    const { data: cameras, error } = await supabase
-      .from('cameras')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Get cameras error:', error);
-      return c.json({ error: 'Failed to fetch cameras' }, 500);
-    }
-
-    return c.json({ cameras: cameras || [] });
-  } catch (error) {
-    console.error('Get cameras error:', error);
-    return c.json({ error: 'Failed to fetch cameras' }, 500);
+// Get camera by ID
+app.get('/:id', (c) => {
+  const id = c.req.param('id');
+  const camera = cameras.find(cam => cam.id === id);
+  
+  if (!camera) {
+    return c.json({ error: 'Camera not found' }, 404);
   }
+
+  return c.json({ camera });
 });
 
-app.get('/:id', async (c) => {
-  try {
-    const id = c.req.param('id');
-    const userId = c.get('userId');
-
-    const { data: camera, error } = await supabase
-      .from('cameras')
-      .select('*')
-      .eq('id', id)
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (error) {
-      console.error('Get camera error:', error);
-      return c.json({ error: 'Failed to fetch camera' }, 500);
-    }
-
-    if (!camera) {
-      return c.json({ error: 'Camera not found' }, 404);
-    }
-
-    return c.json({ camera });
-  } catch (error) {
-    console.error('Get camera error:', error);
-    return c.json({ error: 'Failed to fetch camera' }, 500);
-  }
-});
-
+// Create new camera
 app.post('/', async (c) => {
   try {
     const body = await c.req.json();
     const data = createCameraSchema.parse(body);
-    const userId = c.get('userId');
 
-    const { data: camera, error } = await supabase
-      .from('cameras')
-      .insert({
-        user_id: userId,
-        name: data.name,
-        rtsp_url: data.rtspUrl,
-        location: data.location,
-        face_detection_enabled: data.faceDetectionEnabled ?? true,
-        fps_limit: data.fpsLimit ?? 15,
-        is_active: false,
-        status: 'offline'
-      })
-      .select()
-      .single();
+    const newCamera = {
+      id: `cam-${Date.now()}`,
+      ...data,
+      isActive: false,
+      status: 'offline' as const,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
 
-    if (error) {
-      console.error('Create camera error:', error);
-      return c.json({ error: 'Failed to create camera' }, 500);
-    }
+    cameras.push(newCamera);
 
-    return c.json({ camera }, 201);
+    return c.json({ camera: newCamera }, 201);
   } catch (error) {
     console.error('Create camera error:', error);
     return c.json({ error: 'Failed to create camera' }, 400);
   }
 });
 
+// Update camera
 app.put('/:id', async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json();
     const data = updateCameraSchema.parse(body);
-    const userId = c.get('userId');
 
-    const updateData: any = {};
-    if (data.name !== undefined) updateData.name = data.name;
-    if (data.rtspUrl !== undefined) updateData.rtsp_url = data.rtspUrl;
-    if (data.location !== undefined) updateData.location = data.location;
-    if (data.faceDetectionEnabled !== undefined) updateData.face_detection_enabled = data.faceDetectionEnabled;
-    if (data.fpsLimit !== undefined) updateData.fps_limit = data.fpsLimit;
-
-    const { data: camera, error } = await supabase
-      .from('cameras')
-      .update(updateData)
-      .eq('id', id)
-      .eq('user_id', userId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Update camera error:', error);
-      return c.json({ error: 'Failed to update camera' }, 500);
-    }
-
-    if (!camera) {
+    const cameraIndex = cameras.findIndex(cam => cam.id === id);
+    if (cameraIndex === -1) {
       return c.json({ error: 'Camera not found' }, 404);
     }
 
-    return c.json({ camera });
+    cameras[cameraIndex] = {
+      ...cameras[cameraIndex],
+      ...data,
+      updatedAt: new Date()
+    };
+
+    return c.json({ camera: cameras[cameraIndex] });
   } catch (error) {
     console.error('Update camera error:', error);
     return c.json({ error: 'Failed to update camera' }, 400);
   }
 });
 
-app.delete('/:id', async (c) => {
-  try {
-    const id = c.req.param('id');
-    const userId = c.get('userId');
-
-    const { error } = await supabase
-      .from('cameras')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', userId);
-
-    if (error) {
-      console.error('Delete camera error:', error);
-      return c.json({ error: 'Failed to delete camera' }, 500);
-    }
-
-    return c.json({ message: 'Camera deleted successfully' });
-  } catch (error) {
-    console.error('Delete camera error:', error);
-    return c.json({ error: 'Failed to delete camera' }, 500);
+// Delete camera
+app.delete('/:id', (c) => {
+  const id = c.req.param('id');
+  const cameraIndex = cameras.findIndex(cam => cam.id === id);
+  
+  if (cameraIndex === -1) {
+    return c.json({ error: 'Camera not found' }, 404);
   }
+
+  cameras.splice(cameraIndex, 1);
+  return c.json({ message: 'Camera deleted successfully' });
 });
 
-app.post('/:id/start', async (c) => {
-  try {
-    const id = c.req.param('id');
-    const userId = c.get('userId');
-
-    const { data: camera, error } = await supabase
-      .from('cameras')
-      .update({
-        is_active: true,
-        status: 'online'
-      })
-      .eq('id', id)
-      .eq('user_id', userId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Start camera error:', error);
-      return c.json({ error: 'Failed to start camera' }, 500);
-    }
-
-    if (!camera) {
-      return c.json({ error: 'Camera not found' }, 404);
-    }
-
-    const workerUrl = process.env.WORKER_API_URL || 'http://localhost:8081';
-    fetch(`${workerUrl}/cameras/${id}/start`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(camera)
-    }).catch(err => console.error('Worker start error:', err));
-
-    return c.json({ camera, message: 'Camera stream started' });
-  } catch (error) {
-    console.error('Start camera error:', error);
-    return c.json({ error: 'Failed to start camera' }, 500);
+// Start camera stream
+app.post('/:id/start', (c) => {
+  const id = c.req.param('id');
+  const camera = cameras.find(cam => cam.id === id);
+  
+  if (!camera) {
+    return c.json({ error: 'Camera not found' }, 404);
   }
+
+  camera.isActive = true;
+  camera.status = 'online';
+  camera.updatedAt = new Date();
+
+  // In real implementation, signal the worker service to start processing this stream
+  console.log(`Starting camera stream: ${camera.name}`);
+
+  return c.json({ camera, message: 'Camera stream started' });
 });
 
-app.post('/:id/stop', async (c) => {
-  try {
-    const id = c.req.param('id');
-    const userId = c.get('userId');
-
-    const { data: camera, error } = await supabase
-      .from('cameras')
-      .update({
-        is_active: false,
-        status: 'offline'
-      })
-      .eq('id', id)
-      .eq('user_id', userId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Stop camera error:', error);
-      return c.json({ error: 'Failed to stop camera' }, 500);
-    }
-
-    if (!camera) {
-      return c.json({ error: 'Camera not found' }, 404);
-    }
-
-    const workerUrl = process.env.WORKER_API_URL || 'http://localhost:8081';
-    fetch(`${workerUrl}/cameras/${id}/stop`, {
-      method: 'POST'
-    }).catch(err => console.error('Worker stop error:', err));
-
-    return c.json({ camera, message: 'Camera stream stopped' });
-  } catch (error) {
-    console.error('Stop camera error:', error);
-    return c.json({ error: 'Failed to stop camera' }, 500);
+// Stop camera stream
+app.post('/:id/stop', (c) => {
+  const id = c.req.param('id');
+  const camera = cameras.find(cam => cam.id === id);
+  
+  if (!camera) {
+    return c.json({ error: 'Camera not found' }, 404);
   }
+
+  camera.isActive = false;
+  camera.status = 'offline';
+  camera.updatedAt = new Date();
+
+  // In real implementation, signal the worker service to stop processing this stream
+  console.log(`Stopping camera stream: ${camera.name}`);
+
+  return c.json({ camera, message: 'Camera stream stopped' });
 });
 
 export { app as cameraRoutes };

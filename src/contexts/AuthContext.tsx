@@ -1,6 +1,4 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '../lib/supabase';
-import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface User {
   id: string;
@@ -10,10 +8,8 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  session: any | null;
   login: (email: string, password: string) => Promise<boolean>;
-  register: (email: string, password: string, name: string) => Promise<boolean>;
-  logout: () => Promise<void>;
+  logout: () => void;
   isLoading: boolean;
 }
 
@@ -33,74 +29,37 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session?.user) {
-        fetchUserProfile(session.user);
-      } else {
-        setIsLoading(false);
-      }
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session?.user) {
-        fetchUserProfile(session.user);
-      } else {
-        setUser(null);
-        setIsLoading(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const fetchUserProfile = async (authUser: SupabaseUser) => {
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('name')
-        .eq('id', authUser.id)
-        .maybeSingle();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching user profile:', error);
-      }
-
+    // Check for stored JWT token on app load
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      // In a real app, validate the token with the backend
       setUser({
-        id: authUser.id,
-        email: authUser.email || '',
-        name: data?.name || 'User'
+        id: '1',
+        email: 'demo@example.com',
+        name: 'Demo User'
       });
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-    } finally {
-      setIsLoading(false);
     }
-  };
+    setIsLoading(false);
+  }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-
-      if (error) {
-        console.error('Login error:', error.message);
-        return false;
+      // Mock authentication - in real app, call backend API
+      if (email === 'demo@example.com' && password === 'demo123') {
+        const mockToken = 'mock-jwt-token';
+        localStorage.setItem('auth_token', mockToken);
+        setUser({
+          id: '1',
+          email,
+          name: 'Demo User'
+        });
+        return true;
       }
-
-      if (data.user) {
-        await fetchUserProfile(data.user);
-      }
-
-      return true;
+      return false;
     } catch (error) {
       console.error('Login error:', error);
       return false;
@@ -109,68 +68,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const register = async (email: string, password: string, name: string): Promise<boolean> => {
-    setIsLoading(true);
-    try {
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name
-          }
-        }
-      });
-
-      if (authError) {
-        console.error('Registration error:', authError.message);
-        return false;
-      }
-
-      if (!authData.user) {
-        console.error('No user data returned from registration');
-        return false;
-      }
-
-      const { error: profileError } = await supabase
-        .from('users')
-        .insert({
-          id: authData.user.id,
-          email,
-          name
-        });
-
-      if (profileError) {
-        console.error('Profile creation error:', profileError);
-      }
-
-      setUser({
-        id: authData.user.id,
-        email,
-        name
-      });
-
-      return true;
-    } catch (error) {
-      console.error('Registration error:', error);
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const logout = async () => {
-    try {
-      await supabase.auth.signOut();
-      setUser(null);
-      setSession(null);
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
+  const logout = () => {
+    localStorage.removeItem('auth_token');
+    setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, login, register, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );
