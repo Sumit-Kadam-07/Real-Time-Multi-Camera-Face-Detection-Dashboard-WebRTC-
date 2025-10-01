@@ -3,7 +3,7 @@ import { cors } from 'hono/cors';
 import { authRoutes } from './routes/auth';
 import { cameraRoutes } from './routes/cameras';
 import { eventRoutes } from './routes/events';
-import { wsHandler } from './websocket';
+import { wsHandler, websocket } from './websocket';
 
 const app = new Hono();
 
@@ -35,4 +35,5 @@ console.log(`🔌 WebSocket available at ws://localhost:${port}/ws`);
 export default {
   port,
   fetch: app.fetch,
+  websocket
 };
